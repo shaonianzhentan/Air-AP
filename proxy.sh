@@ -1,60 +1,47 @@
 #!/usr/bin/env bash
 
-# Effect: Create a Wifi AP with transparent shadowsocks relay in debian based system;
-# Author: 7sDream
+# 功能：在debian base系统上创建Wi-Fi热点，通过shadowsocks实现透明代理
+# 原作者：7sDream
+# 修改者：Qv Junping
 
-# Dependencies:
-#   - hostapd & dnsmasq & nmcli & rfkill & & iptables & iproute2 is installed
-#   - A wireless network card suppose AP mode, and doesn't connect to any AP now
-#   - If you want shadowsocks relay, shadowsocks-libev needs to be installed
-#   - Run as root
+# 依赖：
+#   - hostapd、dnsmasq、nmcli、rfkill、iptables、iproute2需要安装
+#   - 支持AP模式的无线网卡, 并且当前没有连接任何Wi-Fi
+#   - 如果要使用shadowsocks转发，需要安装shadowsocks-libev
+#   - root权限
 
-# Changelog:
-#   - 2015.03.07:
-#       - Fitst version, basic functional.
-#   - 2016.02.28:
-#       - Chang SheBang.
-#       - User can interactively change interface, ssid and password 
-#         without edit conf files.
-#   - 2017.01.17:
-#       - Fix some bug with `read` command after system upgrade.
-#   - 2017.04.05
-#       - Add shadowsocks relay(include udp relay)
+# ===== [用户配置] ====
 
-# ===== [User configure] ====
-
-# The interface that already has internet access, 
-# in most cases it will be a ethernet interface, like eth0 or enp1s0
-# If empty, will read from $1 or the wizard.
+# 此接口已经可以访问Internet，大多数情况是以太网卡，比如eth0或enp1s0
+# 如果设空，将读取第一个参数或从向导中读取
 WAN_INTERFACE=""
 
-# The interface that used to create AP, 
-# in most cases it will be a wireless interface, like wlan0 or wlp2s0
-# If empty, will read from $2 or the wizard.
+# 此接口将用来创建热点，大多数情况是无线网卡，比如wlan0或wlp2s0
+# 如果设空，将读取第二个参数或从向导中读取
 LAN_INTERFACE=""
 
-# AP SSID, if empty, will read from $3 or the wizard
+# 热点SSID，即热点名，如果设空，将读取第三个参数或从向导中读取
 AP_NAME=""
 
-# AP PASSWORD, if empty, will read from $4 or the wizard
+# 热点密码，如果设空，将读取第四个参数或从向导中读取
 PASSWORD=""
 
-# AP as a transparent proxy, use shadowsocks relay
-# value can be yes/no
-# if empty, read from $5 or the wizard.
+# 使用shadowsocks转发，实现透明代理
+# 值可以是yes或no
+# 如果设空，将读取第五个参数或从向导中读取
 ENABLE_SS_RELAY=""
 
-# ONLY work when ENABLE_SS_RELAY = yes
-SS_SERVER_ADDR=""       # Shadowsocks server address $6
-SS_SERVER_PORT=""       # Shadowsocks server port $7
-SS_PASSWORD=""          # Shadowsocks server password $8
-SS_METHOD=""            # Shadowsocks encryption method $9
-SS_LOCAL_PORT="12345"   # ss-redir local port $10
-SS_TIMEOUT="600"        # shadowsocks timeout
-SS_FAST_OPEN="false"    # Use TCP fast open?
+# 当ENABLE_SS_RELAY = yes时，下边配置有效
+SS_SERVER_ADDR=""       # Shadowsocks服务器地址（参数六）
+SS_SERVER_PORT=""       # Shadowsocks服务器端口（参数七）
+SS_PASSWORD=""          # Shadowsocks账户密码（参数八）
+SS_METHOD=""            # Shadowsocks加密方式（参数九）
+SS_LOCAL_PORT="12345"   # ss-redir本地端口（参数十）
+SS_TIMEOUT="600"        # shadowsocks超时
+SS_FAST_OPEN="false"    # 是否使用TCP fastopen
 # =====
 
-# Show configure to user, wait for a comfirm
+# 显示配置信息，等待用户确认
 NEED_CONFIRM=1
 
 DHCP_ROUTER_IP="192.168.43.1"
@@ -67,21 +54,21 @@ DNS_1="119.29.29.29"
 # Google DNS
 DNS_2="8.8.8.8"
 
-# Other alternative DNS
+# 其他可选DNS
 
-# Alibaba DNS
+# 阿里巴巴DNS
 # DNS_1="223.5.5.5"
 # DNS_2="223.6.6.6"
 
-# USTC LUG DNS
-# 202.38.64.1       (USTC LUG)
-# 202.38.93.153     (USTC LUG Education)
-# 202.141.176.93    (USTC LUG China Mobile)
-# 202.141.162.123   (USTC LUG China Telecom)
+# 中科大LUG DNS
+# 202.38.64.1       (中科大LUG)
+# 202.38.93.153     (中科大LUG Education)
+# 202.141.176.93    (中科大LUG China Mobile)
+# 202.141.162.123   (中科大LUG China Telecom)
 
-# ===== End of [User configure] ====
+# ===== End of [用户配置] ====
 
-# ===== [CONST] =====
+# ===== [设置参数] =====
 SCRIPTPATH=$(dirname $0)
 IPTABLES_CHAIN_NAME="SHADOWSOCKS"
 FWMARK="0x01/0x01"
@@ -132,9 +119,9 @@ RED='\033[0;31m'
 BLUE='\033[0;34m'
 GREEN='\033[0;32m'
 NC='\033[0m'
-# ===== End of [CONST] =====
+# ===== End of [设置参数] =====
 
-# ===== [Function define] =====
+# ===== [定义函数] =====
 function error() {
     echo -e -n "${RED}ERROR!${NC}: "
     echo -e $1
@@ -142,8 +129,8 @@ function error() {
 }
 
 function command_test() {
-    # Test if the [$1: command] exist in system.
-    # If not exist, tell user to install [$2: the package].
+    # 检查系统中[$1: command]是否存在。
+    # 如果不存在，告诉用户安装[$2: the package]
 
     if [ -n "$2" ]; then PACKAGE="$2"; else PACKAGE="$1"; fi
 
@@ -153,9 +140,9 @@ function command_test() {
 }
 
 function input_string() {
-    # Get a string from user with [$1: prompt string],
-    # make sure the length of string greate(or equal) then [$2: min length]
-    # and less then [$3: max length].
+    # 从用户输入[$1: prompt string]中获取字符串
+    # 确保字符串长度大于或等于[$2: min length]
+    # 并小于[$3: max length]。
 
     PROMPT="Please input a string:"
     MIN_LENGTH=0
@@ -175,9 +162,9 @@ function input_string() {
 }
 
 function input_integer() {
-    # Get a integer from user with [$1: prompt string],
-    # make sure the integer greate(or equal) then [$2: min value]
-    # and less then [$3: max value].
+    # 从用户输入[$1: prompt string]中获取整形数字
+    # 确保字符串长度大于或等于[$2: min value]
+    # 并小于[$3: max value]。
 
     PROMPT="Please input a integer:"
     MIN_INTEGER=0
@@ -201,7 +188,7 @@ function input_integer() {
 }
 
 function iptables_chain_bypass_LAN() {
-    # Add rule to iptables [$1: table] [$2: chain] to bypass LAN addresses.
+    # 增加要绕过的LAN地址规则到iptables [$1: table] [$2: chain] 
 
     iptables -t $1 -A $2 -d 0.0.0.0/8 -j RETURN
     iptables -t $1 -A $2 -d 10.0.0.0/8 -j RETURN
@@ -222,10 +209,10 @@ function clean_envirment() {
         kill -9 $(cat ss-redir.pid)
     fi
 
-    # Delete NAT Setting
+    # 删除NAT设置
     iptables -t nat -F
 
-    # Delete SS relay rules
+    # 删除SS转发设置
     if [ "$ENABLE_SS_RELAY" = "yes" ]; then
         iptables -t nat -X $IPTABLES_CHAIN_NAME1
         iptables -t mangle -F
@@ -234,26 +221,26 @@ function clean_envirment() {
         ip route flush table $IPROUTE2_TABLEID
     fi
 
-    # Disable ip forward
+    # 关闭 ip forward
     sysctl net.ipv4.ip_forward=0
 
-    # Start wlan
+    # 打开wlan
     nmcli r wifi on
 
-    # Delete temp configure files
+    # 删除临时配置文件
     rm dnsmasq.conf hostapd.conf
     if [ "$ENABLE_SS_RELAY" = "yes" ]; then
         rm ss-redir.conf ss-redir.pid
     fi
 }
 
-# ===== End of [function define] =====
+# ===== End of [定义函数] =====
 
-# ===== [Prepare for work] =====
-# Make sure run as root before running
+# ===== [准备工作] =====
+# 确保开始执行前是root身份
 (( EUID != 0 )) && exec sudo -- "$0" "$@"
 
-# clean command
+# 清除命令
 if [ "$1" = "clean" ]; then 
     clean_envirment
     exit 0
@@ -270,7 +257,7 @@ if [ -n "$8" ]; then SS_PASSWORD="$8"; fi
 if [ -n "$9" ]; then SS_METHOD="$9"; fi
 if [ -n "$10" ]; then SS_LOCAL_PORT="${10}"; fi
 
-# check dependencies
+# 检查依赖
 command_test "dnsmasq"
 command_test "hostapd"
 command_test "nmcli" "network-manager"
@@ -278,24 +265,24 @@ command_test "ip" "iproute2"
 command_test "rfkill"
 command_test "iptables"
 
-# cd to curtrent dir, make sure configure files can be read
+# 进入当前目录，确保配置文件可读
 cd "$SCRIPTPATH"
-# ===== End of [prepare fo work] =====
+# ===== End of [准备工作] =====
 
-# ===== [Interface configuration] =====
-# Get network interface list
+# ===== [网卡配置] =====
+# 获取网卡列表
 IFS=$'\n' read -r -a interfaces -d '' <<< "$(ip link show | sed -rn 's/^[0-9]+: ((\w|\d)+):.*/\1/p')"
 
 if [ -z "$WAN_INTERFACE" ] || [ -z "$LAN_INTERFACE" ]; then
-    # Print network interface list
+    # 打印网卡；列表
     for i in ${!interfaces[@]}; do echo -e "$i: ${BLUE}${interfaces[$i]}${NC}"; done
     interface_count=${#interfaces[@]}
-    # Set WAN interface name
+    # 设置无线网卡名
     if [ -z "$WAN_INTERFACE" ]; then
         idx="$(input_integer "Input index of your WAN interfaces name: " 0 $interface_count)"
         WAN_INTERFACE=${interfaces[$idx]}
     fi
-    # Set LAN interface name
+    # 设置以太网卡名
     if [ -z "$LAN_INTERFACE" ]; then
         idx="$(input_integer "Input index of your LAN interfaces name: " 0 $interface_count)"
         LAN_INTERFACE=${interfaces[$idx]}
@@ -347,9 +334,9 @@ if [ "$ENABLE_SS_RELAY" = "yes" ]; then
         SS_LOCAL_PORT=$(input_integer "Input your shadowsocks local port: " 0 65536)
     fi
 fi
-# ===== End of [Interface configuration] =====
+# ===== End of [网卡配置] =====
 
-# ===== [Confirm] =====
+# ===== [核实输入] =====
 if [ $NEED_CONFIRM -gt 0 ]; then
     clear
 
@@ -381,65 +368,65 @@ if [ $NEED_CONFIRM -gt 0 ]; then
     read -n 1 -p "Please Confirm your configure, Enter to continue, Ctrl-C to exit."
     clear
 fi
-# ===== End of [Confirm] =====
+# ===== End of [核实输入] =====
 
 echo -e "\n===== Creating WiFi AP... =====\n"
 
-# ===== [Clean up environment] =====
-# Turn down services
+# ===== [清除环境] =====
+# 关闭服务
 service dnsmasq stop
 service hostapd stop
 
-# Kill old processes
+# 杀死旧进程
 killall dnsmasq
 killall hostapd
 
-# Restart wlan interface
+# 重启无线网卡
 nmcli r wifi off
 rfkill unblock wlan
 ifconfig $LAN_INTERFACE up
 
-# Set wlan ip address
+# 设置无线网卡IP
 ifconfig $LAN_INTERFACE $DHCP_ROUTER_IP
-# ===== End of [Clean up environment] =====
+# ===== End of [清除环境] =====
 
-# ===== [Configure NAT] =====
-# Enable ip forwoad
+# ===== [配置NAT] =====
+# 开启 ip forwoad
 sysctl net.ipv4.ip_forward=1
 
-# Delete NAT rules
+# 删除NAT规则
 iptables -t nat -F
 
-# Add NAT rule for normal
+# 添加一般NAT规则
 iptables -P FORWARD ACCEPT
 iptables -t nat -A POSTROUTING -o $WAN_INTERFACE -j MASQUERADE
-# ===== End of [Configure NAT] =====
+# ===== End of [配置NAT] =====
 
-# ===== [Configure shadowsocks relay] =====
+# ===== [配置shadowsocks转发] =====
 if [ "$ENABLE_SS_RELAY" = "yes" ]; then
-    # Add TCP relay
+    # 添加TCP转发
     iptables -t nat -N $IPTABLES_CHAIN_NAME
-    # Shadowsocks bypass self address
+    # Shadowsocks忽略自己的地址
     iptables -t nat -A $IPTABLES_CHAIN_NAME -d $SS_SERVER_ADDR -j RETURN
-    # Shadowsocks bypass LANs and some other reserved addresses
+    # Shadowsocks忽略LAN和其他保留地址
     iptables_chain_bypass_LAN nat $IPTABLES_CHAIN_NAME
-    # Other address relay to shadowsocks
+    # 其他地址都由shadowsocks转发
     iptables -t nat -A $IPTABLES_CHAIN_NAME -p tcp -j REDIRECT --to-ports $SS_LOCAL_PORT
     iptables -t nat -A PREROUTING -p tcp -j $IPTABLES_CHAIN_NAME
 
-    # Enable UDP relay
+    # 开启UDP转发
     ip rule add fwmark $FWMARK table $IPROUTE2_TABLEID
     ip route add local 0.0.0.0/0 dev lo table $IPROUTE2_TABLEID
     iptables -t mangle -N $IPTABLES_CHAIN_NAME
-    # Shadowsocks bypass LANs and some other reserved addresses
+    # Shadowsocks忽略LAN和其他保留地址
     iptables_chain_bypass_LAN mangle $IPTABLES_CHAIN_NAME
-    # Other address relay to shadowsocks
+    # 其他地址都由shadowsocks转发
     iptables -t mangle -A $IPTABLES_CHAIN_NAME -p udp -j TPROXY --on-port $SS_LOCAL_PORT --tproxy-mark $FWMARK
     iptables -t mangle -A PREROUTING -j $IPTABLES_CHAIN_NAME
 fi
-# ===== End of [Configure shadowsocks relay] =====
+# ===== End of [配置shadowsocks转发] =====
 
-# ===== [Gen configure files] =====
+# ===== [生成配置文件] =====
 echo "$DNSMASQ_CONF_TEMPLATE" | sed \
     -e "s/{LAN_INTERFACE}/$LAN_INTERFACE/" \
     -e "s/{DHCP_ROUTER_IP}/$DHCP_ROUTER_IP/" \
@@ -466,9 +453,9 @@ if [ "$ENABLE_SS_RELAY" = "yes" ]; then
         -e "s/{SS_FAST_OPEN}/$SS_FAST_OPEN/" \
         > ss-redir.conf
 fi
-# ===== End of [Gen configure files] =====
+# ===== End of [生成配置文件] =====
 
-# ===== [Start services] =====
+# ===== [开启服务] =====
 if [ "$ENABLE_SS_RELAY" = "yes" ]; then
     ss-redir -c ss-redir.conf -u -f ss-redir.pid &
 fi
@@ -476,15 +463,15 @@ fi
 dnsmasq -C dnsmasq.conf
 hostapd hostapd.conf
 
-# !! Waiting for a <Ctrl+C> here !!
-# ===== End of [Start services] =====
+# !! 等待<Ctrl+C>结束 !!
+# ===== End of [开启服务] =====
 
 echo -e "\nWiFi Stop, Cleaning......\n"
 
-# ===== [Stop Services] =====
-# hostapd stopped by Ctrl+C
+# ===== [结束服务] =====
+# Ctrl+C来结束hostapd
 
 clean_envirment
-# ===== End of [Clean up environment] =====
+# ===== End of [结束服务] =====
 
 echo -e "\nDone!\n"
