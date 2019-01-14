@@ -42,7 +42,7 @@ SS_FAST_OPEN="false"    # 是否使用TCP fastopen
 # =====
 
 # 显示配置信息，等待用户确认
-NEED_CONFIRM=1
+NEED_CONFIRM=0
 
 DHCP_ROUTER_IP="192.168.43.1"
 DHCP_RANGE_MIN="192.168.43.2"
